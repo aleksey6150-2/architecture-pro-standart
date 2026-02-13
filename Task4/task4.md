@@ -77,11 +77,11 @@
 
 ### <a name="_qmphm6d6rvi3"></a>**Диаграмма контекста**
 
-![task3-c4-context.png](src/task3-c4-context.png)
+![task4-c4-context.png](src/task4-c4-context.png)
 
 ### <a name="_qmphm6d6rvi3"></a>**Диаграмма компонентов**
 
-![task3-c4-component.png](src/task3-c4-component.png)
+![task4-c4-component.png](src/task4-c4-component.png)
 
 ### Список крупных задач для каждой системы
 
