@@ -1,0 +1,119 @@
+@startuml C4_Containers_Deposit_Opening_Simplified
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+' === ПЕРСОНЫ ===
+Person(client, "Клиент", "Новый или существующий")
+
+' === КОНТЕЙНЕРЫ ИНТЕРНЕТ-БАНКА ===
+Boundary(ib, "Интернет-банк") {
+    Container(ib_frontend, "SPA", "React.js")
+    Container(ib_bff, "BFF", ".NET Core/Java")
+    Container(ib_legacy, "Ядро (Legacy)", "ASP.NET MVC 4.5")
+    ContainerDb(ib_db, "ИБ БД", "MS SQL")
+}
+
+' === КОНТЕЙНЕРЫ АБС ===
+Boundary(abs, "АБС") {
+    Container(abs_client, "Delphi Client", "Desktop")
+    Container(abs_plsql, "PL-SQL", "Oracle Procedures")
+    ContainerDb(abs_db, "Oracle DB", "RAC")
+    Container(abs_consumer, "Consumer", "Java")
+}
+
+' === НОВЫЕ МИКРОСЕРВИСЫ ===
+Boundary(new, "Новые микросервисы") {
+
+    Container(deposit, "Deposit Service", "Java Spring Boot")
+    ContainerDb(deposit_db, "Deposit DB", "Oracle/PostgreSQL")
+
+    Container(sms, "SMS Service", "Java/Python")
+    ContainerDb(sms_db, "SMS DB", "PostgreSQL")
+
+    Container(rate, "Rate Service", "Java Spring Boot")
+    ContainerDb(rate_db, "Rate DB", "Oracle")
+
+    ContainerDb(cache, "Redis Cache", "")
+    Container(queue, "Message Queue", "RabbitMQ/Kafka")
+}
+
+' === ВНЕШНИЕ ===
+Container(sms_gateway, "SMS-шлюз", "Внешний API")
+
+' === КЛЮЧЕВЫЕ ИНТЕГРАЦИИ ===
+Rel(client, ib_frontend, "HTTPS")
+Rel(client, site, "HTTPS")
+
+Rel(ib_bff, deposit, "REST")
+Rel(ib_bff, rate, "REST")
+
+Rel(deposit, deposit_db, "JDBC")
+Rel(deposit, cache, "Redis")
+Rel(deposit, rate, "REST")
+Rel(deposit, sms, "REST")
+Rel(deposit, queue, "AMQP")
+
+Rel(sms, sms_db, "JDBC")
+Rel(sms, sms_gateway, "HTTP/SMPP")
+
+Rel(rate, rate_db, "JDBC")
+Rel(rate, cache, "Redis")
+
+Rel(queue, abs_consumer, "Async")
+Rel(abs_consumer, abs_plsql, "JDBC")
+
+@enduml
+Версия для Kubernetes-развертывания:
+puml
+@startuml C4_Containers_Deposit_Opening_K8s
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+' === ДЕПЛОЙМЕНТ В KUBERNETES ===
+Deployment_Node(k8s, "Kubernetes Cluster", "Multi-CAZ") {
+
+    ' === NAMESPACE: INTERNET-BANK ===
+    Deployment_Node(ib_ns, "Namespace: internet-bank", "") {
+        Container(ib_frontend, "Frontend Pods", "React.js", "3+ реплик, HPA")
+        Container(ib_bff, "BFF Pods", ".NET Core/Java", "3+ реплик, HPA")
+        Container(ib_legacy, "Legacy Pods", "ASP.NET MVC 4.5", "2 реплики, VM")
+    }
+
+    ' === NAMESPACE: DEPOSIT-SERVICE ===
+    Deployment_Node(deposit_ns, "Namespace: deposit", "") {
+        Container(deposit_api, "Deposit API Pods", "Java Spring Boot", "5+ реплик, HPA по RPS/CPU")
+        Container(deposit_scheduler, "Scheduler Pod", "Java", "1 реплика (leader election)")
+        ContainerDb(deposit_db, "PostgreSQL/Oracle", "StatefulSet", "Master + Replicas")
+        ContainerDb(redis, "Redis Cluster", "StatefulSet", "3+ реплик, сентинель")
+    }
+
+    ' === NAMESPACE: SMS-SERVICE ===
+    Deployment_Node(sms_ns, "Namespace: sms", "") {
+        Container(sms_api, "SMS API Pods", "Java/Python", "3+ реплик, HPA")
+        Container(sms_worker, "SMS Worker Pods", "Java/Python", "2+ реплик")
+        ContainerDb(sms_db, "PostgreSQL", "StatefulSet", "Master + Replicas")
+    }
+
+    ' === NAMESPACE: RATE-SERVICE ===
+    Deployment_Node(rate_ns, "Namespace: rate", "") {
+        Container(rate_api, "Rate API Pods", "Java Spring Boot", "3+ реплик, HPA")
+        Container(rate_admin, "Rate Admin Pod", "React.js", "2 реплики")
+        ContainerDb(rate_db, "Oracle", "External", "Вне K8s")
+    }
+
+    ' === NAMESPACE: MESSAGING ===
+    Deployment_Node(queue_ns, "Namespace: messaging", "") {
+        Container(queue, "RabbitMQ/Kafka", "StatefulSet", "3+ брокеров")
+        Container(consumer, "Queue Consumer Pods", "Java", "2+ реплик, partition-aware")
+    }
+}
+
+' === ВНЕШНИЕ СИСТЕМЫ ===
+Container(abs_external, "АБС (Oracle RAC)", "Вне кластера", "Вертикальное масштабирование")
+Container(sms_gateway, "SMS-шлюз", "Внешний API")
+Container(site, "Сайт", "Вне кластера", "PHP/React")
+
+Rel(deposit_api, queue, "Производство сообщений")
+Rel(consumer, queue, "Потребление сообщений")
+Rel(consumer, abs_external, "JDBC Batch")
+Rel(sms_worker, sms_gateway, "HTTP/SMPP")
+
+@enduml
