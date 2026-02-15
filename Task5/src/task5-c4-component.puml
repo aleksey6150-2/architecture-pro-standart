@@ -1,0 +1,46 @@
+@startuml
+title "Credit Application Service"
+
+skinparam componentStyle rectangle
+skinparam monochrome true
+
+package "Credit Application Service" {
+
+    component "REST API" as API
+    component "Application Logic" as LOGIC
+    component "Scoring Client" as SCORING
+    component "Camunda Producer" as CAMUNDA
+    component "ABS Client" as ABS
+    component "SMS Client" as SMS
+    component "Scheduler" as SCHED
+    database "Credit DB" as DB
+    database "Redis" as CACHE
+    database "Queue" as QUEUE
+}
+
+database "Scoring DB" as SCORING_DB
+component "Scoring API" as SCORING_API
+component "Camunda" as CAMUNDA_API
+database "ABS DB" as ABS_DB
+component "SMS API" as SMS_API
+component "BKI" as BKI
+
+API --> LOGIC
+LOGIC --> SCORING
+LOGIC --> CAMUNDA
+LOGIC --> ABS
+LOGIC --> SMS
+LOGIC <--> DB
+LOGIC <--> CACHE
+SCHED --> CACHE
+SCHED --> DB
+
+SCORING --> SCORING_API
+SCORING_API --> BKI
+SCORING_API --> SCORING_DB
+CAMUNDA --> QUEUE
+QUEUE --> CAMUNDA_API
+ABS --> ABS_DB
+SMS --> SMS_API
+
+@enduml
